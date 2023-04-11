@@ -13,3 +13,6 @@ plan.txt
 # тестовый файл 
 test.py
 
+#логирование
+login_project.log
+

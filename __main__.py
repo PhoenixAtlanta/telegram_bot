@@ -14,11 +14,12 @@ async def bot_start(_):
     ...
 
 
-from handlers.client import register_handlers_client
+from handlers import client, game
 
-register_handlers_client(dp)
+client.register_handlers_client(dp)
+game.register_handler_game(dp)
 
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True, on_startup=bot_start)
-    tprint("bot disconnected  █ ▇ ▆ ▅ ▃ ▂ ▁")
+    tprint("bot disconnected")

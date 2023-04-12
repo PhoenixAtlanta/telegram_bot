@@ -6,6 +6,8 @@ from typing import List
 class ParamsGame:
     ID: str = ""
     players: List = field(default_factory=lambda: [])
+    step: int = 1
+    player: int = 0
 
 
 def set_params() -> dict:

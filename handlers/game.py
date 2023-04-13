@@ -1,13 +1,13 @@
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram import types, Dispatcher
-from dataclasses import dataclass, field
-from typing import List
+
 from random import shuffle
 
 from app import bot, dp, bot_params
 from auxiliary_functions import reset
 #* импорт клавиатуры
+from keyboards import player_keyboards, professions_keyboard, step_keyboard
 
 
 class FSMAdmin(StatesGroup):
@@ -21,14 +21,17 @@ class FSMAdmin(StatesGroup):
 
 
 async def get_player(players: list=bot_params["params_game"].players, index: int=bot_params["params_game"].player) -> int:
-    return players[index]
+    return players[index][0]
 
 
 
 async def cmd_start_game(message: types.Message):
     bot_params["params_game"].ID = message.from_user.id
     await FSMAdmin.team_formation.set()
-    await message.answer("Создаем команду, для того чтобы участвовать в игре напишите /i")
+    try:
+        await message.answer("Создаем команду, для того чтобы участвовать в игре напишите /i", reply_markup=player_keyboards)
+    except Exception as e:
+        print(e)
     bot_params["params_game"].players.append([message.from_user.id, message.from_user.first_name])
     
     # try:
@@ -78,16 +81,18 @@ async def get_help(message: types.Message, state=FSMContext):
 async def append_player(message: types.Message, state=FSMContext):  # +-
     id_player = message.from_user.id
 
-    if id_player in bot_params["params_game"].players:  # +
-        await message.reply("{игрок}, Вы уже участвуете!")
+    if any(id_player == player[0] for player in bot_params["params_game"].players):
+
+        await message.reply("{игрок}, Вы уже участвуете!", reply_markup=player_keyboards)
 
     # написать код ошибки, если игрок не написал боту
 
     else:  # -
-        bot_params["params_game"].players.append(id_player)  # +
-        await message.reply("{игрок}, Вы теперь в игре!")
-        await bot.send_message(message.from_user.id, text="Если вы получили это сообщение, то все хорошо!")
-    
+        try:
+            bot_params["params_game"].players.append([id_player, message.from_user.full_name])  # +
+            await bot.send_message(message.chat.id, text="{игрок}, Вы теперь в игре!\nЕсли вы получили это сообщение, то все хорошо!", reply_markup=player_keyboards)
+        except Exception as e:
+            print(e)
 
 #! /кто играет
 async def get_players(message: types.Message, state=FSMContext):
@@ -99,8 +104,8 @@ async def get_players(message: types.Message, state=FSMContext):
 async def leave_player(message: types.Message, state=FSMContext):
     id_player = message.from_user.id
 
-    if id_player in bot_params["params_game"].players:
-        bot_params["params_game"].players.remove(id_player)
+    if any(id_player == player[0] for player in bot_params["params_game"].players):
+        bot_params["params_game"].players.remove([id_player, message.from_user.full_name])
         await message.reply(f"__игрок__, Вы вышли из игры.\nВсего игроков {len(bot_params['params_game'].players)}")
 
     else:
@@ -110,31 +115,32 @@ async def leave_player(message: types.Message, state=FSMContext):
 #! /go
 async def go(message: types.Message, state=FSMContext):
     await message.answer("Игра началась!")
+    try:
+        print([player for player in bot_params["params_game"].players])
+        [await bot.send_message(player[0], text="**ваши карты**") for player in bot_params["params_game"].players]
 
-    for player in bot_params['params_game'].players:
-        await bot.send_message(player, "**ваши карты**")
+        await FSMAdmin.next()  # закончилась регистрация, началась игра
+        await message.answer("__событие в мире__")
 
-    await FSMAdmin.next()  # закончилась регистрация, началась игра
-    await message.answer("__событие в мире__")
+        shuffle(bot_params["params_game"].players)  # распределяем игроков случайным образом
 
-    shuffle(bot_params["params_game"].players)  # распределяем игроков случайным образом
-
-    await message.answer(f"первый ходит игрок __{await get_player()}__\nкогда Вы закончите ход напишите команду /all")
-    await next_step(message, state)
-
+        await message.answer(f"первый ходит игрок __{await get_player()}__\nкогда Вы закончите ход напишите команду /all")
+        await next_step(message, state)
+    except Exception as e:
+        print(e)
     
 async def next_step(message: types.Message, state=FSMContext):
 
     if bot_params["params_game"].player + 1 <= len(bot_params["params_game"].players):
         bot_params["params_game"].player += 1
 
-        await message.answer(f"следующий ходит {get_player()}")
+        await message.answer(f"следующий ходит {await get_player()}")
         
         if bot_params["params_game"].step > 1:
-            await message.answer("Выберете одну из карт")
+            await message.answer("Выберете одну из карт", reply_markup=professions_keyboard)
 
         else:
-            await message.answer("Выберете карту профессии")
+            await message.answer("Выберете карту профессии", reply_markup=professions_keyboard)
 
         await FSMAdmin.show_cart.set()
 
@@ -145,7 +151,7 @@ async def next_step(message: types.Message, state=FSMContext):
 
 
 async def get_cart(message: types.Message, state=FSMContext):
-    await message.answer(f"вы выбрали карту {message.text}\nвремя на описание карты")
+    await message.answer(f"вы выбрали карту {message.text}\nвремя на описание карты", reply_markup=step_keyboard)
     await FSMAdmin.voting.set()
 
 
@@ -159,10 +165,8 @@ async def voting(message: types.Message, state: FSMContext):
 
     else:
         bot_params["params_game"].player = 0
-        await message.answer(f"ходит игрок {get_player()}")
         await FSMAdmin.n_step.set()
-
-    
+        await next_step(message, state)
 
 
 #// проверить help

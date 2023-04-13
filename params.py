@@ -2,6 +2,16 @@ from dataclasses import dataclass, field
 from typing import List
 
 
+buttons_name = {
+    "player_buttons": ("/кто", "/leave"),
+    "card": ("профессия", "здоровье", "биологические характеристики",
+              "хобби", "фобии", "дополнительная информация",
+                "человеческие качества", "Специальные условия 1",
+                  "Специальные условия 2"),
+    "step": ("/all", "Кто ходит"),
+
+}
+
 @dataclass
 class ParamsGame:
     ID: str = ""

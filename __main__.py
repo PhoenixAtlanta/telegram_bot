@@ -10,7 +10,7 @@ async def bot_start(_):
     logging.basicConfig(level=logging.INFO, filename="login_project.log",
                         filemode="w", format="%(asctime)s %(levelname)s %(message)s")
     print("█ login start █")
-    print("▁ ▂ ▃ ▅ ▆ ▇ █ Бот запущен!")
+    print("▁ ▂ ▃ ▅ ▆ ▇ █ xБот запущен!")
     ...
 
 

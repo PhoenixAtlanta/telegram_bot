@@ -24,7 +24,8 @@ def set_params() -> dict:
     """return dict with all value dataclass value"""
 
     params_bot = {
-        "params_game": ParamsGame()
+        "params_game": ParamsGame(),
+        "name_json": "data_file/game_json.json"
     }
 
     return params_bot

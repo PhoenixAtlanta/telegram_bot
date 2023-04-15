@@ -2,15 +2,18 @@ from dataclasses import dataclass, field
 from typing import List
 
 
-buttons_name = {
-    "player_buttons": ("/кто", "/leave"),
-    "card": ("профессия", "здоровье", "биологические характеристики",
+all_cards = ["профессия", "здоровье", "биологические характеристики",
               "хобби", "фобии", "дополнительная информация",
                 "человеческие качества", "Специальные условия 1",
-                  "Специальные условия 2"),
+                  "Специальные условия 2"]
+
+buttons_name = {
+    "player_buttons": ("/кто", "/leave"),
+    "card": all_cards.copy(),
     "step": ("/all", "Кто ходит"),
 
 }
+
 
 @dataclass
 class ParamsGame:
@@ -25,7 +28,6 @@ def set_params() -> dict:
 
     params_bot = {
         "params_game": ParamsGame(),
-        "name_json": "data_file/game_json.json"
     }
 
     return params_bot

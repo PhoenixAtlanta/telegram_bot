@@ -5,11 +5,11 @@ from aiogram import types, Dispatcher
 from random import shuffle
 
 from app import bot, dp, bot_params
-from working_data import working_json
+from working_data import *
 from auxiliary_functions import reset
 #* импорт клавиатуры
 from keyboards import player_keyboards, professions_keyboard, step_keyboard
-
+from params import all_cards
 
 class FSMAdmin(StatesGroup):  # машина состояния
     team_formation = State()  # образование команды
@@ -20,16 +20,9 @@ class FSMAdmin(StatesGroup):  # машина состояния
     stop = State()  # завершение игры
 
 
-
-# (I) - хендлеры управления игрой 
-# (II) - хендлеры для работы с пользователем, как с объектом 
-# (III) - хендлеры длс работы пользователя с программой, для получения информации 
-# (IV) - методы
-
 #* (I) - хендлеры управления игрой 
 
 async def cmd_start_game(message: types.Message, state=FSMContext):
-    # working_json.writing_admin(message.from_user.id)
 
     await FSMAdmin.team_formation.set()
 
@@ -38,11 +31,11 @@ async def cmd_start_game(message: types.Message, state=FSMContext):
 
         data["players_condition"] = [message.from_user.id, ]
 
-        data["players"] = {message.from_user.id: {"nickname": message.from_user.full_name, "used_card": []}, }
+        data["players"] = {message.from_user.id: {"nickname": message.from_user.full_name, "card": all_cards.copy()}, }
 
         data["step_player"] = 0
 
-        data["step"] = 0
+        data["step"] = 1
     
     await message.answer("Создаем команду, для того чтобы участвовать в игре напишите /i", reply_markup=player_keyboards)
 
@@ -50,28 +43,26 @@ async def cmd_start_game(message: types.Message, state=FSMContext):
 #! /go
 async def go(message: types.Message, state=FSMContext):
     await message.answer("Игра началась!")
-    try:
-        [await bot.send_message(player, text="**ваши карты**") for player in get_players(state)]
+    [await bot.send_message(player, text="**ваши карты**") for player in await player_condition_prop(state)]
 
-        await FSMAdmin.next()  # закончилась регистрация, началась игра
-        await message.answer("__событие в мире__")
-  # распределяем игроков случайным образом
-        shuffle_players(state)
+    await FSMAdmin.next()  # закончилась регистрация, началась игра
+    await message.answer("__событие в мире__")
+# распределяем игроков случайным образом
+    await shuffle_players(state)
 
-        await message.answer(f"первый ходит игрок __{await get_now_player(state)}__\nкогда Вы закончите ход напишите команду /all")
-        await next_step(message, state)
-    except Exception as e:
-        print(e)
+    await message.answer(f"первый ходит игрок __{await players_prop(state, key='nickname')}__\nкогда Вы закончите ход напишите команду /all", reply_markup=step_keyboard)
+    await next_step(message, state)
+
 
 
 async def next_step(message: types.Message, state=FSMContext):
-    if property_step_player(state) <= len(get_players) - 1:
-        await property_step_player(state, event="1")
+    if await step_player_prop(state) <= len(await player_condition_prop(state)) - 1:
+        await step_player_prop(state, event="1")
 
 
-        await message.answer(f"следующий ходит {await get_now_player(state)}")
-        
-        if property_step_player(state) > 1:
+        await message.answer(f"следующий ходит {await players_prop(state, key='nickname')}")
+    
+        if await step_prop(state) > 1:
             await message.answer("Выберете одну из карт", reply_markup=professions_keyboard)
             #! card
 
@@ -81,6 +72,7 @@ async def next_step(message: types.Message, state=FSMContext):
 
         await FSMAdmin.show_cart.set()
 
+
     else:
         await message.answer("круг завершился \n\n Перейдем к голосованию")
         await FSMAdmin.voting.set()
@@ -89,20 +81,22 @@ async def next_step(message: types.Message, state=FSMContext):
 
 async def get_cart(message: types.Message, state=FSMContext):
     await message.answer(f"вы выбрали карту {message.text}\nвремя на описание карты", reply_markup=step_keyboard)
+    #! добавить карту в использованные
     await FSMAdmin.voting.set()
 
 
 async def voting(message: types.Message, state: FSMContext):
     await message.answer("прошло голосование")
+    #!голосование
 
-    await property_step_player(state, event="1")
+    await step_prop(state, event="1")
     
-    if await property_next_step(state) >= 5:
+    if await step_prop(state) > 5:
         await message.answer("игра закончена")
         await state.finish()
 
     else:
-        await property_step_player(state, event="0")
+        await step_player_prop(state, event="0")
         await FSMAdmin.n_step.set()
         await next_step(message, state)
 
@@ -129,7 +123,7 @@ async def cancel_handler(message: types.Message, state: FSMContext):
 async def append_player(message: types.Message, state=FSMContext):  # +-
     id_player = message.from_user.id
 
-    if any(id_player == player for player in get_players(state)):
+    if any(id_player == player for player in await player_condition_prop(state)):
 
         await message.reply("{игрок}, Вы уже участвуете!", reply_markup=player_keyboards)
 
@@ -137,8 +131,11 @@ async def append_player(message: types.Message, state=FSMContext):  # +-
 
     else:  # -
         try:
+            await players_prop(state, event="add", id_player=id_player, value={"nickname": message.from_user.full_name, "card": all_cards.copy()})
 
-            bot_params["params_game"].players.append([id_player, message.from_user.full_name])  # +
+            await player_condition_prop(state, id_player=id_player, event="add")
+            print(await player_condition_prop(state))
+
             await bot.send_message(message.chat.id, text="{игрок}, Вы теперь в игре!\nЕсли вы получили это сообщение, то все хорошо!", reply_markup=player_keyboards)
         except Exception as e:
             print(e)
@@ -147,22 +144,26 @@ async def append_player(message: types.Message, state=FSMContext):  # +-
 #! /выйти
 async def leave_player(message: types.Message, state=FSMContext):
     id_player = message.from_user.id
+    try:
 
-    if any(id_player == player[0] for player in bot_params["params_game"].players):
-        bot_params["params_game"].players.remove([id_player, message.from_user.full_name])
-        await message.reply(f"__игрок__, Вы вышли из игры.\nВсего игроков {len(bot_params['params_game'].players)}")
+        if any(id_player == player for player in await player_condition_prop(state)):
+            print("игрок есть")
+            await players_prop(state, event="del", id_player=id_player)
+            await player_condition_prop(state, event="del", id_player=id_player)
 
-    else:
-        await message.reply("Вы не участвовали")
+            await message.reply(f"__игрок__, Вы вышли из игры.\nВсего игроков {len(await player_condition_prop(state))}")
+
+        else:
+            await message.reply("__имя__, Вы не участвовали")
+
+    except Exception as e:
+        print(e)
 
 
 async def exclude_player(message: types.Message, state: FSMContext):
-    if message.from_user.id == bot_params["params_game"].ID:
-        for id_p, nickname in bot_params["params_game"].players:
-
-            if nickname in message.text:
-                bot_params["params_game"].players.remove([id_p, nickname])
-                message.reply(f"Игрок {nickname} был исключен по просьбе администратора")
+    if message.from_user.id == await admin_id_prop(state):
+        ...
+        #! исключить игрока
     
     else:
         ...
@@ -179,98 +180,12 @@ async def get_help(message: types.Message, state=FSMContext):
 
 #! /кто играет
 async def get_players(message: types.Message, state=FSMContext):
-    mes = "\n".join([f"{num + 1} - {player}" for num, player in enumerate(bot_params["params_game"].players)])
-    await message.reply(f"Всего участников {len(bot_params['params_game'].players)}\n\n{mes}")
+    mes = "\n".join([f"{num + 1} - {player}" for num, player in enumerate(await player_condition_prop(state))])
+    await message.reply(f"Всего участников {len(await player_condition_prop(state))}\n\n{mes}")
 
 #* (IV) - методы
 
 
-async def admin_id_prop(state, event=None):
-    """получить id админа или установить новое"""
-    async with state.proxy() as data:
-        if event is None:
-            return data["admin_id"]
-
-        else:
-            data["admin_id"] = event
-
-
-async def players_prop(state, id_player: int=0, key: str="", value=None, event=None):
-    """получить данные игрока или записать"""
-    async with state.proxy() as data:
-
-        if event is None:  # вернуть значение по ключу
-            return data["players"][id_player][key]
-        
-        elif key == "card":  # удалить карту из списка
-            cards = data["players"][id_player][key]
-            cards.remove(value)
-            data["players"][id_player][key] = cards
-        
-        elif event == "key":  # изменить элемент
-            data["players"][id_player][key] = value
-
-        elif event == "add":  # добавить игрока
-            data["players"][value["id"]] = {"nick_name": value["nick_name"], "card": []}
-
-        elif event == "del":  # удалить игрока
-            keys = list(data["players"].keys())
-            keys.remove(id_player)
-            new_dict = {}
-
-            for key in keys:
-                new_dict[keys] = data["players"][keys]
-
-            data["players"] = new_dict.copy()
-            del new_dict
-        
-
-async def step_player_prop(state, event:str="get"):
-    """получить или установить новое значение следующего игрока"""
-
-    async with state.proxy() as data:
-        if event == "get":
-            return data["step_player"]
-
-        elif event == "1":
-            data["step_player"] += 1
-
-        elif event == "0":
-            data["step_player"] = 0
-
-
-
-async def step_prop(state, event=None):
-    async with state.proxy() as data:
-        if event is None:
-            return data["step"]
-        
-        elif event == "1":
-            data["step"] += 1
-
-
-async def player_condition_prop(state, id_player: int, event=None, ):
-    async with state.proxy() as data:
-        if event is None:
-            return data["players_condition"]
-        
-        elif event == "add":
-            data["players_condition"].append(id_player)
-
-        elif event == "del":
-            data["players_condition"].remove(id_player)
-
-
-async def get_player(state):
-    """получить id текущего игрока"""
-    async with state.proxy() as data:
-        return data["players_condition"][step_player_prop(state)]
-    
-
-async def shuffle_players(state):
-    """поменять порядок игроков"""
-    async with state.proxy() as data:
-        data["players_condition"] = shuffle(data["players_condition"])
 
 
 #// проверить help

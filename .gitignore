@@ -16,3 +16,5 @@ test.py
 #логирование
 login_project.log
 
+
+data_file.game_json.json

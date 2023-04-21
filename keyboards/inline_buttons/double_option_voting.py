@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from ..inline_buttons.create_inline_buttons import create_inline_buttons
 
-yes_button = InlineKeyboardButton("да", callback_data="yes")
-no_button = InlineKeyboardButton("нет", callback_data="no")
+double_inline_value = {"да": {"number": 0, "callback": "yes"}, "нет": {"number": 0, "callback": "no"}}
 
+double_inline_keyboard = create_inline_buttons(double_inline_value, type_placement="add")
 
-double_inline_keyboard = InlineKeyboardMarkup().add(yes_button, no_button)

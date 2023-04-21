@@ -64,7 +64,6 @@ async def players_prop(state, id_player: int=None, param: str=None, value=None, 
         elif event == "add":
             if "players" not in data.keys():
                 data["players"] = {}
-                print(3)
 
             data["players"][id_player] = {"nickname": nickname, "card": card}
 
@@ -153,12 +152,12 @@ voting: {
     """
 
 
-async def voting_get(state, event: str=None, type_voting: str=None, name_variants: str=None, key_variants: str=None,
+async def voting_prop(state, event: str=None, type_voting: str=None, name_variants: str=None, key_variants: str=None,
                       value=None, id_message: int=None, variants: list=[]):
     async with state.proxy() as data:
 
         if event == "add":
-            data["voting"][type_voting] = {"id_message": id_message, "variants": {}}
+            data["voting"][type_voting] = {"id_message": id_message, "quantity_players": 0, "variants": {}}
 
             for variant in variants:
                 elem = {"number": 0, "choices": []}
@@ -171,11 +170,31 @@ async def voting_get(state, event: str=None, type_voting: str=None, name_variant
             data["voting"][type_voting]["variants"][name_variants]["choice"].append(value)
             data["voting"][type_voting]["variants"][name_variants]["number"] += 1
 
+
+        elif event == "get_winner":
+            winners = {key: data["voting"]["game_over"]["variants"][key] for key in sorted(data["voting"]["game_over"]["variants"],
+                                                                                            key=lambda key: data["voting"]["game_over"]["variants"][key]["number"], reverse=True)}
+            
+            winners = list(filter(lambda key: winners[list(winners.keys())[0]]["number"] == winners[key]["number"], winners))
+
+            
+            return winners
+
+         
         elif event == "number":
             return data["voting"][type_voting]["variants"][name_variants]["number"]
-        
-        elif event == "choices":
-            data["voting"][type_voting]["variants"][name_variants]["choice"].append(value)
+                 
+        elif event == "choice":
+            return data["voting"][type_voting]["variants"][name_variants]["choice"]
+               
+        elif event == "quantity_players":
+            if value:
+                data["voting"][type_voting]["quantity_players"] += 1
 
+            else:
+                return data["voting"][type_voting]["quantity_players"]
+                 
         elif event == "id_message":
             return data["voting"][type_voting]["id_message"]
+        
+        

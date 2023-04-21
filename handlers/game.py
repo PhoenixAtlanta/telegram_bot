@@ -37,31 +37,31 @@ async def cmd_start_game(message: types.Message, state=FSMContext):
     await FSMAdmin.team_formation.set()
 
     async with state.proxy() as data:
-        data["current_player"]: int=0
-        await current_player_prop(state, value=0)
+        try:
+            data["current_player"]: int=0
+ 
+            data["number_step"]: int=1
 
-        data["number_step"]: int=1
-        await number_step_prop(state, value=1)
+            data["admin_id"]: int=0# message.from_user.id
 
-        data["admin_id"]: int=message.from_user.id
-        await admin_id_prop(state, message.from_user.id)
+            data["chat_id"]: int=message.chat.id
 
-        data["chat_id"]: int=message.chat.id
-        await chat_id_prop(state, message.chat.id)
 
-        data["players_condition"]: list=[message.from_user.id, ]
-        await players_condition_prop(state, id_player=message.from_user.id, event="add")
+            data["players_condition"]: list=[message.from_user.id, ]
 
-        data["players"]: dict={message.from_user.id: {"nickname": message.from_user.full_name, "card": all_cards.copy()}}
-        await players_prop(state, event="add", nickname=message.from_user.username, card=all_cards.copy())
 
-        data["voting"]: dict={
-                                "bunker": {},  # сделать метод, который будет создавать пустой шаблон
-                                "admin": {},
-                                "player": {},
-                                "game_over": {}
-                                }
-                
+            data["players"]: dict={message.from_user.id: {"nickname": message.from_user.full_name, "card": all_cards.copy()}}
+
+            data["voting"]: dict={
+                                    "bunker": {},  # сделать метод, который будет создавать пустой шаблон
+                                    "admin": {},
+                                    "player": {},
+                                    "game_over": {}
+                                    }
+            
+        except Exception as e:
+            print(e)
+                        
     await message.answer("Создаем команду, для того чтобы участвовать в игре напишите /i", reply_markup=keyboards.player_keyboards)
 
 
@@ -108,22 +108,60 @@ async def get_cart(message: types.Message, state=FSMContext):
 
 
 
-
 async def cancel_handler(message: types.Message, state: FSMContext):
 
     if message.from_user.id == await admin_id_prop(state):
-        current_state = await state.get_state()
-
-        if current_state is None: return
-
-        await state.finish()
+        await game_over(message, state)
         await message.reply("Игра закончена по просьбе")
 
         # сбросить ве значения игры   
     else:
         await message.answer("""Игру может закончить администратор {админ}!
-        \n Попросите администратора закончить игру или сами станьте администратором""")
-        #! voting
+        \n Попросите администратора закончить игру или сами станьте администратором""", reply_markup=keyboards.double_inline_keyboard)
+        await voting_prop(state, event="add", type_voting="game_over", id_message=0, variants=["yes", "no"])
+
+
+async def work_voting_cancel_handler(query: types.CallbackQuery, state=FSMContext):
+    id_player = query.from_user.id
+
+    if len(await voting_prop(state, event="quantity_players", type_voting="game_over")) == len(await players_condition_prop(state)):
+        winners = await voting_prop(state, event="get_winner", type_voting="game_over")
+
+        if len(winners) > 1:
+            await bot.send_message(chat_id=query.message.chat.id, text="точного результата нет")
+        
+        elif list(winners.keys())[0] == "yes":
+            await game_over(query, state)
+            await bot.send_message(chat_id=query.message.chat.id, text="вы решили закончить игру __голосовавшие__")
+
+        else:
+            await bot.send_message(chat_id=query.message.chat.id, text="вы решили продолжить игру __голосовавшие__")
+
+
+
+        await voting_prop(state,event="del", type_voting="game_over")
+        
+        return 
+    
+    if id_player in await voting_prop(state, event="quantity_players", type_voting="game_over"):
+        bot.send_message(query.message.chat.id, text="__player__ вы уже проголосовали")
+    
+    else:
+        voting_prop(state, type_voting="game_over", name_variants=query.data, value=id_player)
+
+
+
+    
+
+
+async def game_over(message, state: FSMAdmin):
+    current_state = await state.get_state()
+
+    if current_state is None:
+        return
+    
+    await state.finish()
+        
 
 
 
@@ -211,6 +249,7 @@ def register_handler_game(dp: Dispatcher):
     dp.register_message_handler(get_cart, commands=["cart"], state=FSMAdmin)
 
     dp.register_message_handler(cancel_handler, commands=["stop"], state="*")
+    dp.register_callback_query_handler(work_voting_cancel_handler, lambda answer: answer.data in ("yes", "no"), state=FSMAdmin)
 
     dp.register_message_handler(append_player, commands=["i"], state="*")
     dp.register_message_handler(leave_player, commands=["выйти", "leave"], state="*")

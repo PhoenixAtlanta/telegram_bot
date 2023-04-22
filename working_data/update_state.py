@@ -2,6 +2,7 @@ from random import shuffle
 
 from app import bot 
 from working_data.working_json import *
+import keyboards
 
 
 async def admin_id_prop(state, value: int=None):
@@ -136,28 +137,12 @@ async def get_id_name(state, name):
                 return id_player
             
 
-    """
-voting: {
-    bunker: {
-        id_message = int,
-        variants: {
-            name: {
-                id: int,
-                number: int,
-                choices: list[id,]
-            }
-        }
-    }
-}
-    """
-
-
 async def voting_prop(state, event: str=None, type_voting: str=None, name_variants: str=None, key_variants: str=None,
                       value=None, id_message: int=None, variants: list=[]):
     async with state.proxy() as data:
 
         if event == "add":
-            data["voting"][type_voting] = {"id_message": id_message, "quantity_players": 0, "variants": {}}
+            data["voting"][type_voting] = {"id_message": id_message, "quantity_players": [], "variants": {}}
 
             for variant in variants:
                 elem = {"number": 0, "choices": []}
@@ -167,13 +152,14 @@ async def voting_prop(state, event: str=None, type_voting: str=None, name_varian
             data["voting"][type_voting] = {}
 
         elif name_variants:  # проголосовали
-            data["voting"][type_voting]["variants"][name_variants]["choice"].append(value)
+            data["voting"][type_voting]["variants"][name_variants]["choices"].append(value)
             data["voting"][type_voting]["variants"][name_variants]["number"] += 1
+            data["voting"][type_voting]["quantity_players"].append(value)
 
 
         elif event == "get_winner":
-            winners = {key: data["voting"]["game_over"]["variants"][key] for key in sorted(data["voting"]["game_over"]["variants"],
-                                                                                            key=lambda key: data["voting"]["game_over"]["variants"][key]["number"], reverse=True)}
+            winners = {key: data["voting"][type_voting]["variants"][key] for key in sorted(data["voting"][type_voting]["variants"],
+                                                                                            key=lambda key: data["voting"][type_voting]["variants"][key]["number"], reverse=True)}
             
             winners = list(filter(lambda key: winners[list(winners.keys())[0]]["number"] == winners[key]["number"], winners))
 
@@ -185,11 +171,11 @@ async def voting_prop(state, event: str=None, type_voting: str=None, name_varian
             return data["voting"][type_voting]["variants"][name_variants]["number"]
                  
         elif event == "choice":
-            return data["voting"][type_voting]["variants"][name_variants]["choice"]
+            return data["voting"][type_voting]["variants"][name_variants]["choices"]
                
         elif event == "quantity_players":
             if value:
-                data["voting"][type_voting]["quantity_players"] += 1
+                data["voting"][type_voting]["quantity_players"].append(value)
 
             else:
                 return data["voting"][type_voting]["quantity_players"]
@@ -198,3 +184,34 @@ async def voting_prop(state, event: str=None, type_voting: str=None, name_varian
             return data["voting"][type_voting]["id_message"]
         
         
+async def change_buttons_message(state, voting_data: dict, type_voting: str, param_keyboard: str="add"):
+    async with state.proxy() as data:
+        result_now = {key: data["voting"][type_voting]["variants"][key]["number"] for key in data["voting"][type_voting]["variants"]}
+
+    for key in result_now:
+        voting_data[key]["number"] = result_now[key] 
+
+    inline_button = {key: voting_data[key] for key in result_now} 
+    return keyboards.create_inline(inline_button, type_placement=param_keyboard)
+
+
+async def get_result_voting(state, type_voting):
+
+    async with state.proxy() as data:
+
+        result = {key: data["voting"][type_voting]['variants'][key] for key in data["voting"][type_voting]['variants']}
+        for key in result:
+            result[key]["choices"] = [await players_prop(state, id_player=id_player, param="nickname") for id_player in result[key]["choices"]]  
+
+
+        quantity_str =  {elem: "\n".join(result[elem]["choices"]) for elem in result}
+        print(quantity_str)
+
+        str_result = "Результаты голосования:\n\n" + "\n".join([f"{elem} - {result[elem]['number']}\n   {quantity_str[elem]}" for elem in result])
+    return str_result
+
+
+
+async def print_state(state, key="voting"):
+    async with state.proxy() as data:
+        print(data)

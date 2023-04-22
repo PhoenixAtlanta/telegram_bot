@@ -118,43 +118,45 @@ async def cancel_handler(message: types.Message, state: FSMContext):
     else:
         await message.answer("""Игру может закончить администратор {админ}!
         \n Попросите администратора закончить игру или сами станьте администратором""", reply_markup=keyboards.double_inline_keyboard)
-        await voting_prop(state, event="add", type_voting="game_over", id_message=0, variants=["yes", "no"])
+        await voting_prop(state, event="add", type_voting="game_over", id_message=0, variants=["да", "нет"])
 
 
 async def work_voting_cancel_handler(query: types.CallbackQuery, state=FSMContext):
     id_player = query.from_user.id
 
-    if len(await voting_prop(state, event="quantity_players", type_voting="game_over")) == len(await players_condition_prop(state)):
-        winners = await voting_prop(state, event="get_winner", type_voting="game_over")
-
-        if len(winners) > 1:
-            await bot.send_message(chat_id=query.message.chat.id, text="точного результата нет")
-        
-        elif list(winners.keys())[0] == "yes":
-            await game_over(query, state)
-            await bot.send_message(chat_id=query.message.chat.id, text="вы решили закончить игру __голосовавшие__")
-
-        else:
-            await bot.send_message(chat_id=query.message.chat.id, text="вы решили продолжить игру __голосовавшие__")
-
-
-
-        await voting_prop(state,event="del", type_voting="game_over")
-        
-        return 
-    
     if id_player in await voting_prop(state, event="quantity_players", type_voting="game_over"):
-        bot.send_message(query.message.chat.id, text="__player__ вы уже проголосовали")
+        await bot.send_message(query.message.chat.id, text="__player__ вы уже проголосовали")
+    
     
     else:
-        voting_prop(state, type_voting="game_over", name_variants=query.data, value=id_player)
+        await voting_prop(state, type_voting="game_over", name_variants=query.data, value=id_player)
 
+    await query.message.edit_reply_markup(await change_buttons_message(state, type_voting="game_over", voting_data=keyboards.double_inline_value, param_keyboard="add"))
 
+    if len(await voting_prop(state, event="quantity_players", type_voting="game_over")) == len(await players_condition_prop(state)):
+        winners = await voting_prop(state, event="get_winner", type_voting="game_over")
+        
+        if len(winners) > 1:
+            await bot.send_message(chat_id=query.message.chat.id, text="точного результата нет")
 
+        else:
+
+            if winners[0] == "да":
+                await bot.send_message(chat_id=query.message.chat.id, text="вы решили закончить игру __голосовавшие__")
+                await output_result(query, state, type_voting="game_over")
+                await game_over(query, state)
+
+            else:
+                await bot.send_message(chat_id=query.message.chat.id, text="вы решили продолжить игру __голосовавшие__")
+                await output_result(query, state, type_voting="game_over")
+
+                await voting_prop(state, event="del", type_voting="game_over")
+
+        return 
     
 
-
 async def game_over(message, state: FSMAdmin):
+    print("finish")
     current_state = await state.get_state()
 
     if current_state is None:
@@ -162,8 +164,6 @@ async def game_over(message, state: FSMAdmin):
     
     await state.finish()
         
-
-
 
 #* (II) - хендлеры для работы с пользователем, как с объектом 
 
@@ -234,6 +234,12 @@ async def change_admin(message: types.Message, state=FSMContext):
 #* (IV) - методы
 
 
+async def output_result(query: types.CallbackQuery, state: FSMContext, type_voting: str):
+    text = await get_result_voting(state, type_voting=type_voting)
+    print(text)
+    await query.message.edit_text(text)
+
+
 #// проверить help
 #? написать бота, и проверить добавление игроков
 #// кто играет
@@ -249,7 +255,7 @@ def register_handler_game(dp: Dispatcher):
     dp.register_message_handler(get_cart, commands=["cart"], state=FSMAdmin)
 
     dp.register_message_handler(cancel_handler, commands=["stop"], state="*")
-    dp.register_callback_query_handler(work_voting_cancel_handler, lambda answer: answer.data in ("yes", "no"), state=FSMAdmin)
+    dp.register_callback_query_handler(work_voting_cancel_handler, lambda answer: answer.data in ("да", "нет"), state=FSMAdmin)
 
     dp.register_message_handler(append_player, commands=["i"], state="*")
     dp.register_message_handler(leave_player, commands=["выйти", "leave"], state="*")

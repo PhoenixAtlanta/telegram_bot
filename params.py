@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from string import ascii_letters, digits
 from typing import List
 
 
@@ -14,6 +15,7 @@ buttons_name = {
 
 }
 
+nickname_symbols = ascii_letters + digits + "_"
 
 @dataclass
 class ParamsGame:

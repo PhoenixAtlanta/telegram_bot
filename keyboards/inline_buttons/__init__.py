@@ -1,4 +1,6 @@
 from keyboards.inline_buttons.double_option_voting import double_inline_keyboard, double_inline_value
-from keyboards.inline_buttons.players_voting import player_inline_keyboard
+from keyboards.inline_buttons.bunker_inline import set_bunker_value
+from keyboards.inline_buttons.admin_inline import set_admin_value
+from keyboards.inline_buttons.expel_player_inline import expel_player_keyboard, expel_player_value
 from keyboards.inline_buttons.create_inline_buttons import create_inline 
  

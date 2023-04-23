@@ -2,6 +2,7 @@ from random import shuffle
 
 from app import bot 
 from working_data.working_json import *
+from params import nickname_symbols 
 import keyboards
 
 
@@ -60,7 +61,11 @@ async def players_prop(state, id_player: int=None, param: str=None, value=None, 
                 return data["players"][id_player]
             
             else:
-                return data["players"][id_player][param]
+                result = data["players"][id_player][param]
+                if param == "nickname":
+                    result = "@" + result
+
+                return result
             
         elif event == "add":
             if "players" not in data.keys():
@@ -113,9 +118,6 @@ async def number_step_prop(state, value=None):
 
             data["number_step"] += value
 
-
-async def voting(state):
-    ...
 
 
 async def get_player(state):  # получить id текущего игрока  
@@ -178,7 +180,10 @@ async def voting_prop(state, event: str=None, type_voting: str=None, name_varian
                 data["voting"][type_voting]["quantity_players"].append(value)
 
             else:
-                return data["voting"][type_voting]["quantity_players"]
+                try:
+                    return data["voting"][type_voting]["quantity_players"]
+                except Exception as e:
+                    print(e, "error")        
                  
         elif event == "id_message":
             return data["voting"][type_voting]["id_message"]
@@ -205,13 +210,37 @@ async def get_result_voting(state, type_voting):
 
 
         quantity_str =  {elem: "\n".join(result[elem]["choices"]) for elem in result}
-        print(quantity_str)
+        
 
         str_result = "Результаты голосования:\n\n" + "\n".join([f"{elem} - {result[elem]['number']}\n   {quantity_str[elem]}" for elem in result])
     return str_result
 
 
+async def candidates_prop(state, value: list=None):
+    async with state.proxy() as data:
+        if not value:
+            return data["candidates"]
+        data["candidates"] = value
+        
+
+async def find_username(text) -> str:
+    username = ""
+    start = False
+    for letter in text:
+
+        if letter in nickname_symbols and start:
+            username += letter
+        
+        else:
+            if letter == "@" and not start:
+                start = True
+                continue
+            elif start:
+                break
+    
+    return username
+
 
 async def print_state(state, key="voting"):
     async with state.proxy() as data:
-        print(data)
+        print(data[key])

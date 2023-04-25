@@ -3,12 +3,13 @@ import logging
 from art import tprint
 from aiogram.utils import executor
 
-from app import dp
+from app import dp, data_base
 
 
 async def bot_start(_):
     logging.basicConfig(level=logging.INFO, filename="login_project.log",
                         filemode="w", format="%(asctime)s %(levelname)s %(message)s")
+    
     print("█ login start █")
     print("▁ ▂ ▃ ▅ ▆ ▇ █ xБот запущен!")
     ...

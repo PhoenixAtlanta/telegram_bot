@@ -1,13 +1,12 @@
 from aiogram import types, Dispatcher
+import working_data
 
-from app import bot, dp
+from app import bot
 
 
 async def cmd_start(message: types.Message):
-    try:
-        await bot.send_message(message.from_user.id, text="***доки***")
-    except Exception as a:
-        print(a)
+    await bot.send_message(message.from_user.id, text=working_data.dialog("main_help"))
+
 
 
 def register_handlers_client(dp: Dispatcher):

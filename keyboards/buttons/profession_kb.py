@@ -3,6 +3,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from app import params_game
 
 
+# кнопка, краты профессия, при первом круге игры
 buttons_names = params_game.buttons_text["profession"]
 buttons = [KeyboardButton(name) for name in buttons_names]
 

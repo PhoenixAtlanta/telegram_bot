@@ -9,6 +9,9 @@ from data import json_data_work, state_data_work
 import keyboards
 
 
+MAX_STEP = 5  # количество кругов 
+MIN_PLAYER = 2  # минимальное количество игроков 
+
 # класс состояния fsm машины
 class FSMAdmin(StatesGroup):  # машина состояния
     team_formation = State()  # образование команды
@@ -65,9 +68,9 @@ async def go(message: types.Message, state=FSMContext):
 
 
 async def next_step(message: types.Message, state=FSMContext):
-    # проверка на логический конец игры
-    if await state_data_work.number_step_prop(state) == 5 or \
-        len(await state_data_work.players_condition_prop(state)) <= 1: 
+    # проверка на логический конец игры, или это последний круг или игроков меньше 3
+    if await state_data_work.number_step_prop(state) == MAX_STEP or \
+        len(await state_data_work.players_condition_prop(state)) <= MIN_PLAYER: 
 
         winners = "\n- ".join(await state_data_work.players_condition_prop(state))
         await message.answer(
@@ -97,7 +100,8 @@ async def next_step(message: types.Message, state=FSMContext):
 
 
     else:  # реализовать голосование
-        if await state_data_work.number_step_prop(state) > 1:  # если это не первый круг (правила игры)
+        # если это не первый круг (правила игры)
+        if await state_data_work.number_step_prop(state) > 1:  
             await message.answer(json_data_work.dialog("voting_text"),
                                 reply_markup=ReplyKeyboardRemove())
             await FSMAdmin.voting.set()  # установить машину на "голосование"
@@ -138,7 +142,8 @@ async def get_cart(message: types.Message, state=FSMContext):
 async def next_player(message: types.Message, state=FSMContext):
     # увеличить ход игроков
     nickname = await state_data_work.get_player(state)
-    await message.reply(f"{nickname} закончил свой ход.") 
+    await message.reply(f"{nickname} закончил свой ход.")
+    # увеличить индекс игрока
     await state_data_work.current_player_prop(
         state, value=await state_data_work.current_player_prop(state) + 1)
     await FSMAdmin.n_step.set()  # следующий ход
@@ -173,7 +178,8 @@ async def append_player(message: types.Message, state=FSMContext):
 
         else:
             await message.reply(f"Игрок, {player} добавлен")
-            await state_data_work.players_prop(state, event="add", nickname=player, cart=params_game.cart_for_game.copy())
+            await state_data_work.players_prop(state, event="add", nickname=player,
+                                               cart=params_game.cart_for_game.copy())
             await state_data_work.players_condition_prop(state, nickname=player, event="add")
 
 
@@ -226,18 +232,21 @@ async def delete_player(message: types.Message, state: FSMContext,
 
 
 async def update_circle(message: types.Message, state: FSMContext):
-    await state_data_work.number_step_prop(state, value=1)
-    await state_data_work.current_player_prop(state, value=0)
+    await state_data_work.number_step_prop(state, value=1)  # увеличить номер круга на один
+    await state_data_work.current_player_prop(state, value=0)  # начать с первого игрока
 
 
 def register_handler_game(dp: Dispatcher):
     # хендлеры управления игрой
     dp.register_message_handler(cmd_start_game, commands=["start"])
     dp.register_message_handler(go, commands=["go"], state=FSMAdmin.team_formation)
-    dp.register_message_handler(append_player, filters.Text(contains="/append"), state=FSMAdmin.team_formation)
-    dp.register_message_handler(voting_bunker, filters.Text(contains="/voting"), state=FSMAdmin.voting)
+    dp.register_message_handler(append_player, filters.Text(contains="/append"), 
+                                state=FSMAdmin.team_formation)
+    dp.register_message_handler(voting_bunker, filters.Text(contains="/voting"), 
+                                state=FSMAdmin.voting)
     dp.register_message_handler(cmd_delete_player, filters.Text(contains="/delete"), state="*")
-    dp.register_message_handler(get_cart, filters.Text(equals=params_game.cart_for_game), state=FSMAdmin.show_cart)
+    dp.register_message_handler(get_cart, filters.Text(equals=params_game.cart_for_game),
+                                state=FSMAdmin.show_cart)
     dp.register_message_handler(next_player, commands=["all"], state=FSMAdmin.next_player)
     dp.register_message_handler(cancel_handler, commands=["stop"], state="*")
     # хендлеры, которые помогают ориентироваться 
